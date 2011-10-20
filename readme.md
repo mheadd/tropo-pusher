@@ -6,8 +6,8 @@ A speech recognition / multi-lingual text-to-speech app that runs on the Tropo p
 Requirements
 ===========
 
-A Tropo account - signup is [free](https://www.tropo.com/account/register.jsp).
-A Pusher account - signup and pricing [here](http://pusher.com/pricing#showsignup).
+* A Tropo account - signup is [free](https://www.tropo.com/account/register.jsp).
+* A Pusher account - signup and pricing [here](http://pusher.com/pricing#showsignup).
 
 Add your Pusher credentials to the file 'tropo-pusher.php', and add your Pusher App ID in the file 'pusher.html'.
 
@@ -18,7 +18,7 @@ Currently supports US, UK and Spanish ASR & TTS.
 Credits
 ======
 
-[Tropo WebAPI library](https://github.com/tropo/tropo-webapi-php).
-[Limonade PHP microframework](https://github.com/sofadesign/limonade/).
-[Pusher PHP library](https://github.com/squeeks/Pusher-PHP).
+* [Tropo WebAPI library](https://github.com/tropo/tropo-webapi-php).
+* [Limonade PHP microframework](https://github.com/sofadesign/limonade/).
+* [Pusher PHP library](https://github.com/squeeks/Pusher-PHP).
 
