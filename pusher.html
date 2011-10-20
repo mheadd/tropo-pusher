@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<head>
+  <title>Pusher + Tropo Demo</title>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.3/jquery.min.js"></script>
+  <script src="http://js.pusherapp.com/1.9/pusher.min.js"></script>
+  <script type="text/javascript">
+  
+    var pusher = new Pusher('');
+   
+    pusher.connection.bind('connected', function() {
+      console.log("Connected to Pusher!");
+    });    
+    
+    var channel = pusher.subscribe('tropo-color');
+    
+    channel.bind('change', function(data) {
+    	console.log(data);
+    	var payload = JSON.parse(data);
+	    if(payload.type == "call_info") {
+	    	$("#connect").append("<p>" + payload.called_id + " : " + payload.country + "</p>");		
+	    }
+	    else {
+	    	$("#color").removeClass().addClass(payload.color);
+	    }      	
+    });
+    
+  </script>
+  <style type="text/css">
+
+body {
+	text-align: center;
+}
+
+h2 {
+	margin-top: 30px;	
+}
+
+.blue, .azul {
+	background-color: blue;
+}
+
+.green, .verde  {
+	background-color: green;
+}
+
+.yellow, .amarillo {
+	background-color: yellow;
+}
+
+.white, .blanco {
+	background-color: white;
+}
+
+.red, .rojo {
+	background-color: red;
+}
+
+</style>
+</head>
+<body id="color" class="red">
+<h2>Pusher + Tropo FTW!</h2>
+<div id="connect"></div>
+</body>
+</html>
+
+</head>
