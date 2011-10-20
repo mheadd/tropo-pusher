@@ -13,7 +13,6 @@ define("PUSHER_CHANNEL", "tropo-color");
 define("PUSHER_EVENT", "change");
 
 /**
- * 
  * Object used to hold country-specific settings.
  *
  */
