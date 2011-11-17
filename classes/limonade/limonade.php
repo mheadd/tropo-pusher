@@ -60,8 +60,7 @@ define('LIM_NAME',              'Un grand cru qui sait se faire attendre');
 define('LIM_START_MICROTIME',   (float)substr(microtime(), 0, 10));
 define('LIM_SESSION_NAME',      'LIMONADE'.str_replace('.','x',LIMONADE));
 define('LIM_SESSION_FLASH_KEY', '_lim_flash_messages');
-if(function_exists('memory_get_usage'))
-	define('LIM_START_MEMORY',      memory_get_usage());
+define('LIM_START_MEMORY',      memory_get_usage());
 define('E_LIM_HTTP',            32768);
 define('E_LIM_PHP',             65536);
 define('E_LIM_DEPRECATED',      35000);
@@ -73,10 +72,8 @@ define('X-SENDFILE',            10);
 define('X-LIGHTTPD-SEND-FILE',  20);
 
 # for PHP 5.3.0 <
-if(!defined('E_DEPRECATED'))         define('E_DEPRECATED',        8192);
-if(!defined('E_USER_DEPRECATED'))    define('E_USER_DEPRECATED',   16384);
-# for PHP 5.2.0 <
-if (!defined('E_RECOVERABLE_ERROR')) define('E_RECOVERABLE_ERROR', 4096);
+if(!defined('E_DEPRECATED'))      define('E_DEPRECATED', 8192);
+if(!defined('E_USER_DEPRECATED')) define('E_USER_DEPRECATED', 16384);
 
 
 ## SETTING BASIC SECURITY _____________________________________________________
@@ -187,7 +184,6 @@ dispatch(array("/_lim_public/**", array('_lim_public_file')), 'render_limonade_f
 # - function before_exit(){}
 # - function before_render($content_or_func, $layout, $locals, $view_path){}
 # - function autorender($route){}
-# - function before_sending_header($header){}
 #
 # See abstract.php for more details.
 
@@ -321,12 +317,13 @@ function run($env = null)
    
   # 0. Set default configuration
   $root_dir  = dirname(app_file());
-  $lim_dir   = dirname(__FILE__);
   $base_path = dirname(file_path($env['SERVER']['SCRIPT_NAME']));
   $base_file = basename($env['SERVER']['SCRIPT_NAME']);
   $base_uri  = file_path($base_path, (($base_file == 'index.php') ? '?' : $base_file.'?'));
-  
+  $lim_dir   = dirname(__FILE__);
   option('root_dir',           $root_dir);
+  option('base_path',          $base_path);
+  option('base_uri',           $base_uri); // set it manually if you use url_rewriting
   option('limonade_dir',       file_path($lim_dir));
   option('limonade_views_dir', file_path($lim_dir, 'limonade', 'views'));
   option('limonade_public_dir',file_path($lim_dir, 'limonade', 'public'));
@@ -335,8 +332,6 @@ function run($env = null)
   option('controllers_dir',    file_path($root_dir, 'controllers'));
   option('lib_dir',            file_path($root_dir, 'lib'));
   option('error_views_dir',    option('limonade_views_dir'));
-  option('base_path',          $base_path);
-  option('base_uri',           $base_uri); // set it manually if you use url_rewriting
   option('env',                ENV_PRODUCTION);
   option('debug',              true);
   option('session',            LIM_SESSION_NAME); // true, false or the name of your session
@@ -346,7 +341,6 @@ function run($env = null)
   option('x-sendfile',         0); // 0: disabled, 
                                    // X-SENDFILE: for Apache and Lighttpd v. >= 1.5,
                                    // X-LIGHTTPD-SEND-FILE: for Apache and Lighttpd v. < 1.5
-
 
   # 1. Set handlers
   # 1.1 Set error handling
@@ -366,11 +360,10 @@ function run($env = null)
   }
   
   # 2.2 Set X-Limonade header
-  if($signature = option('signature')) send_header("X-Limonade: $signature");
+  if($signature = option('signature')) header("X-Limonade: $signature");
 
   # 3. Loading libs
   require_once_dir(option('lib_dir'));
-  fallbacks_for_not_implemented_functions();
 
   # 4. Starting session
   if(!defined('SID') && option('session'))
@@ -448,25 +441,21 @@ function run($env = null)
 function stop_and_exit($exit = true)
 {
   call_if_exists('before_exit', $exit);
+  $flash_sweep = true;
   $headers = headers_list();
-  if(request_is_head())
-  { 
-     ob_end_clean();
-  } else {
-    $flash_sweep = true;
-    foreach($headers as $header)
+  foreach($headers as $header)
+  {
+    // If a Content-Type header exists, flash_sweep only if is text/html
+    // Else if there's no Content-Type header, flash_sweep by default
+    if(stripos($header, 'Content-Type:') === 0)
     {
-      // If a Content-Type header exists, flash_sweep only if is text/html
-      // Else if there's no Content-Type header, flash_sweep by default
-      if(stripos($header, 'Content-Type:') === 0)
-      {
-        $flash_sweep = stripos($header, 'Content-Type: text/html') === 0;
-        break;
-      }
+      $flash_sweep = stripos($header, 'Content-Type: text/html') === 0;
+      break;
     }
-    if($flash_sweep) flash_sweep();
   }
+  if($flash_sweep) flash_sweep();
   if(defined('SID')) session_write_close();
+  if(request_is_head()) ob_end_clean();
   if($exit) exit;
 }
 
@@ -1355,8 +1344,7 @@ function route_find($method, $path)
         {
           $names = range($n_names, $n_matches - 1);
         }
-        $arr_comb = array_combine($names, $matches);
-        $params = array_replace($params, $arr_comb);
+        $params = array_replace($params, array_combine($names, $matches));
       }
       $route["params"] = $params;
       return $route;
@@ -1466,7 +1454,7 @@ function partial($content_or_func, $locals = array())
  */ 
 function html($content_or_func, $layout = '', $locals = array())
 {
-  send_header('Content-Type: text/html; charset='.strtolower(option('encoding')));
+  if(!headers_sent()) header('Content-Type: text/html; charset='.strtolower(option('encoding')));
   $args = func_get_args();
   return call_user_func_array('render', $args);
 }
@@ -1494,7 +1482,7 @@ function layout($function_or_file = null)
  */
 function xml($data)
 {
-  send_header('Content-Type: text/xml; charset='.strtolower(option('encoding')));
+  if(!headers_sent()) header('Content-Type: text/xml; charset='.strtolower(option('encoding')));
   $args = func_get_args();
   return call_user_func_array('render', $args);
 }
@@ -1509,7 +1497,7 @@ function xml($data)
  */
 function css($content_or_func, $layout = '', $locals = array())
 {
-  send_header('Content-Type: text/css; charset='.strtolower(option('encoding')));
+  if(!headers_sent()) header('Content-Type: text/css; charset='.strtolower(option('encoding')));
   $args = func_get_args();
   return call_user_func_array('render', $args);
 }
@@ -1524,7 +1512,7 @@ function css($content_or_func, $layout = '', $locals = array())
  */
 function js($content_or_func, $layout = '', $locals = array())
 {
-  send_header('Content-Type: application/javascript; charset='.strtolower(option('encoding')));
+  if(!headers_sent()) header('Content-Type: application/javascript; charset='.strtolower(option('encoding')));
   $args = func_get_args();
   return call_user_func_array('render', $args);
 }
@@ -1539,15 +1527,13 @@ function js($content_or_func, $layout = '', $locals = array())
  */
 function txt($content_or_func, $layout = '', $locals = array())
 {
-  send_header('Content-Type: text/plain; charset='.strtolower(option('encoding')));
+  if(!headers_sent()) header('Content-Type: text/plain; charset='.strtolower(option('encoding')));
   $args = func_get_args();
   return call_user_func_array('render', $args);
 }
 
 /**
- * Returns json representation of data with proper http headers.
- * On PHP 5 < PHP 5.2.0, you must provide your own implementation of the
- * <code>json_encode()</code> function beore using <code>json()</code>.
+ * Returns json representation of data with proper http headers
  *
  * @param string $data 
  * @param int $json_option
@@ -1555,7 +1541,7 @@ function txt($content_or_func, $layout = '', $locals = array())
  */
 function json($data, $json_option = 0)
 {
-  send_header('Content-Type: application/json; charset='.strtolower(option('encoding')));
+  if(!headers_sent()) header('Content-Type: application/json; charset='.strtolower(option('encoding')));
   return version_compare(PHP_VERSION, '5.3.0', '>=') ? json_encode($data, $json_option) : json_encode($data);
 }
 
@@ -1585,26 +1571,12 @@ function render_file($filename, $return = false)
     $content_type = mime_type(file_extension($filename));
     $header = 'Content-type: '.$content_type;
     if(file_is_text($filename)) $header .= '; charset='.strtolower(option('encoding'));
-    send_header($header);
+    if(!headers_sent()) header($header);
     return file_read($filename, $return);
   }
   else halt(NOT_FOUND, "unknown filename $filename");
 }
 
-/**
- * Call before_sending_header() if it exists, then send headers
- * 
- * @param string $header
- * @return void
- */
-function send_header($header = null, $replace = true, $code = false)
-{
-    if(!headers_sent()) 
-    {
-        call_if_exists('before_sending_header', $header);
-        header($header, $replace, $code);
-    }
-}
 
 
 
@@ -1821,26 +1793,21 @@ function end_content_for()
 
 /**
  * Shows current memory and execution time of the application.
- * Returns only execution time if <code>memory_get_usage()</code> 
- * isn't available.
- * ( That's the case before PHP5.2.1 if PHP isn't compiled with option 
- *   <code>--enable-memory-limit</code>. )
  * 
  * @access public
  * @return array
  */
 function benchmark()
 {
-	$res = array( 'execution_time' => (microtime() - LIM_START_MICROTIME) );
-  if(defined('LIM_START_MEMORY'))
-	{
-		$current_mem_usage     = memory_get_usage();
-		$res['current_memory'] = $current_mem_usage;
-		$res['start_memory']   = LIM_START_MEMORY;
-		$res['average_memory'] = (LIM_START_MEMORY + $current_mem_usage) / 2;
-	}
-	
-	return $res;
+  $current_mem_usage = memory_get_usage();
+  $execution_time = microtime() - LIM_START_MICROTIME;
+  
+  return array(
+    'current_memory' => $current_mem_usage,
+    'start_memory' => LIM_START_MEMORY,
+    'average_memory' => (LIM_START_MEMORY + $current_mem_usage) / 2,
+    'execution_time' => $execution_time
+  );
 }
 
 
@@ -1962,8 +1929,8 @@ function debug($var, $output_as_html = true)
       $out = var_export($var, true);
       break;
   }
-  if ($output_as_html) { $out = "<pre>\n" . h($out) ."</pre>"; }
-  return $out;
+  if ($output_as_html) { $out = h($out);  }
+  return "<pre>\n" . $out ."</pre>";
 }
 
 
@@ -2036,7 +2003,7 @@ function status($code = 500)
   if(!headers_sent())
   {
     $str = http_response_status_code($code);
-    send_header($str);
+    header($str);
   }
 }
 
@@ -2083,9 +2050,8 @@ function redirect_to($params)
       $n_params[] = $param;
     }
     $uri = call_user_func_array('url_for', $n_params);
-    $uri = htmlspecialchars_decode($uri, ENT_NOQUOTES);
     stop_and_exit(false);
-    send_header('Location: '.$uri, true, $status);
+    header('Location: '.$uri, true, $status);
     exit;
   }
 }
@@ -2613,51 +2579,6 @@ function filter_var_url($str)
 }
 
 
-/**
- * For PHP 5 < 5.1.0 (backward compatibility)
- * (from {@link http://www.php.net/manual/en/function.htmlspecialchars-decode.php#82133})
- * 
- * @param string $string 
- * @param string $quote_style, one of: ENT_COMPAT, ENT_QUOTES, ENT_NOQUOTES 
- * @return the decoded string
- */
-function limonade_htmlspecialchars_decode($string, $quote_style = ENT_COMPAT)
-{
-	$table = array_flip(get_html_translation_table(HTML_SPECIALCHARS, $quote_style));
-	if($quote_style === ENT_QUOTES)
-		$table['&#039;'] = $table['&#39;'] = '\'';
-	return strtr($string, $table);
-}
-
-if(!function_exists('htmlspecialchars_decode'))
-{
-	function htmlspecialchars_decode($string, $quote_style = ENT_COMPAT)
-	{
-		return limonade_htmlspecialchars_decode($string, $quote_style);
-	}
-}
-
-/**
- * Called just after loading libs, it provides fallback for some 
- * functions if they don't exists.
- *
- */
-function fallbacks_for_not_implemented_functions()
-{
-  if(!function_exists('json_encode'))
-  {
-    /**
-     * for PHP 5 < PHP 5.2.0
-     *
-     */
-    function json_encode()
-    {
-      trigger_error(
-        __FUNCTION__ . '(): no JSON functions available. Please provide your own implementation of ' . __FUNCTION__ . '() in order to use it.', E_USER_WARNING
-      );
-    }
-  }
-}
 
 
 

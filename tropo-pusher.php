@@ -4,6 +4,7 @@
 require 'classes/tropo/tropo.class.php';
 require 'classes/limonade/limonade.php';
 require 'classes/pusher/Pusher.php';
+require 'classes/country.php';
 
 // User defined constants for interacting with Pusher platform.
 define("PUSHERAPP_AUTHKEY", "");
@@ -13,29 +14,10 @@ define("PUSHER_CHANNEL", "tropo-color");
 define("PUSHER_EVENT", "change");
 
 /**
- * Object used to hold country-specific settings.
- *
+ * 
+ * Utility function to get country name from called number.
+ * @param string $calledID
  */
-class CountryObject {
-	public $name;
-	public $recognizer;
-	public $voice;
-	public $choices;
-	public $welcome_prompt;
-	public $color_prompt;
-	public $error_prompt;
-
-	public function __construct($name, $recognizer, $voice, $choices, $welcome_prompt, $color_prompt, $error_prompt) {
-		$this->name = $name;
-		$this->recognizer = $recognizer;
-		$this->voice = $voice;
-		$this->choices = $choices;
-		$this->welcome_prompt = $welcome_prompt;
-		$this->color_prompt = $color_prompt;
-		$this->error_prompt = $error_prompt;		
-	}
-}
-
 function getCountryName($calledID) {
 	switch(substr($calledID, 0, 1)) {
 		case '4':
@@ -51,7 +33,6 @@ function getCountryName($calledID) {
 			break;
 	}
 }
-
 
 /**
  *
@@ -202,6 +183,7 @@ function handleError() {
 
 }
 
+// Run the app.
 run();
 
 ?>
